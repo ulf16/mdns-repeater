@@ -25,9 +25,89 @@ interface and vlan1 as the WAN interface, I would use:
 You can also specify the -f flag for debugging, which prints packets as they 
 are received.
 
-You are free to modify the code to repeat whatever traffic you require, as
-long as you abide by the software license.
 
+Choosing Interfaces
+-------------------
+`mdns-repeater` repeats packets **between the interfaces you name**, so you must pick the correct pair(s) for your system. Typical cases:
+
+- Home router or SBC:
+  - `mdns-repeater br0 eth0`
+  - `mdns-repeater end0 wg0` (LAN ↔ WireGuard)
+- Dual‑NIC host bridging two LANs:
+  - `mdns-repeater eth0 eth1`
+- Wi‑Fi ↔ Ethernet on a laptop/AP:
+  - `mdns-repeater wlan0 eth0`
+
+> Tip: list your interfaces with `ip -br link` and find their IPs with `ip -br addr`.
+
+Examples
+--------
+**Two interfaces** (most common):
+
+```
+mdns-repeater <LAN-IFACE> <TUNNEL-IFACE>
+# e.g.
+mdns-repeater end0 wg0
+```
+
+**Three or more interfaces** (fully meshed):
+
+```
+mdns-repeater br0 eth1 wg0
+```
+All packets received on one interface are re‑sent on the others. Order does not matter.
+
+Systemd Service (interface-specific)
+------------------------------------
+For a persistent setup, create a unit that pins the exact interfaces on **that** machine. Replace the names to match your host:
+
+```
+[Unit]
+Description=mDNS repeater (LAN↔WG)
+After=network-online.target wg-quick@wg0.service
+Requires=wg-quick@wg0.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/mdns-repeater -q -f end0 wg0
+Restart=always
+RestartSec=2
+KillSignal=SIGINT
+StandardOutput=null
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+```
+
+If your LAN interface is different (e.g., `enx001e063263da`), change the `ExecStart` line accordingly. For multiple LANs, name all of them: `ExecStart=... mdns-repeater -q -f lan0 lan1 wg0`.
+
+Docker/Avahi notes
+------------------
+- Only one Avahi instance should bind UDP/5353 on the host. If containers run Avahi, either disable it inside the container or avoid `--network=host`.
+- You can restrict host Avahi to specific interfaces in `/etc/avahi/avahi-daemon.conf`:
+
+```
+[server]
+allow-interfaces=end0,wg0
+deny-interfaces=docker0,veth*,br*
+```
+
+Verification & Troubleshooting
+------------------------------
+1. See service status:
+   - `systemctl status mdns-repeater`
+2. Watch traffic:
+   - `sudo tcpdump -ni <iface> udp port 5353`
+3. List services across subnets:
+   - `avahi-browse -rt _ipp._tcp`
+4. If you see `send(): Required key not available` over WireGuard:
+   - Ensure the WG peer’s `AllowedIPs` include multicast ranges: `224.0.0.0/4` (IPv4) and `ff00::/8` (IPv6).
+5. If the service starts/stops rapidly under systemd, use foreground mode (`-f`) in the unit, or set `Type=forking` if you prefer daemon mode.
+
+Security & Scope
+----------------
+This tool only repeats mDNS (UDP/5353). It does not forward arbitrary traffic. Pair it with proper routing between subnets for unicast replies (or use your routers’ site‑to‑site link) so discovery completes end‑to‑end.
 
 LICENSE
 --------
@@ -46,4 +126,3 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-
