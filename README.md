@@ -14,6 +14,16 @@ repeater does not need to forge the source address. Instead, the source
 address is of the interface that repeats the packet.
 
 
+Introduction
+------------
+mdns-repeater provides seamless reflection of mDNS traffic between multiple network interfaces, enabling discovery of services across subnets. Key features include:
+
+- Reflection of both IPv4 and IPv6 mDNS packets.
+- Support for legacy unicast reply forwarding to aid Bonjour and Time Capsule device resolution.
+- Compatibility with systemd foreground service operation.
+- Coexistence with Avahi daemon through use of `SO_REUSEADDR` and `SO_REUSEPORT` socket options.
+
+
 USAGE
 -----
 mdns-repeater only requires the interface names and it will do the rest.
@@ -24,6 +34,21 @@ interface and vlan1 as the WAN interface, I would use:
 
 You can also specify the -f flag for debugging, which prints packets as they 
 are received.
+
+
+Build & Install
+---------------
+To build the program, run:
+
+    make
+
+To install the binary system-wide, run:
+
+    sudo make install
+
+Verify the installed version with:
+
+    mdns-repeater -v
 
 
 Choosing Interfaces
@@ -108,6 +133,16 @@ Verification & Troubleshooting
 Security & Scope
 ----------------
 This tool only repeats mDNS (UDP/5353). It does not forward arbitrary traffic. Pair it with proper routing between subnets for unicast replies (or use your routers’ site‑to‑site link) so discovery completes end‑to‑end.
+
+Version
+-------
+Current release: v1.2.0
+
+Changelog highlights:
+- Added IPv6 mDNS reflection support.
+- Improved legacy unicast reply forwarding for better Bonjour compatibility.
+- Enhanced systemd foreground service integration.
+- Improved coexistence with Avahi via socket option adjustments.
 
 LICENSE
 --------
